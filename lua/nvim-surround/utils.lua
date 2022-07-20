@@ -263,8 +263,9 @@ M.get_nearest_selections = function(char)
             buffer.set_curpos(curpos)
         end
     end
-    -- If a pair of selections is found, jump to the beginning of the left one
-    if nearest_selections then
+    -- If a pair of selections is found, and multiple aliases have been checked, jump to the beginning of the left one
+    -- TODO: Probably can't use `f` inside a tabular alias?
+    if #chars > 1 and config.get_opts().move_cursor and nearest_selections then
         buffer.set_curpos(nearest_selections.left.first_pos)
     end
 
