@@ -67,9 +67,8 @@ M.get_delimiters = function(char, args)
     return vim.deepcopy(delimiters)
 end
 
-
 -- Gets a delimiter pair for a user-inputted character, returns nil for functions.
----@param char string The input character.
+---@param char string? The input character.
 ---@return string[][]? @A pair of simple delimiters for the given input, or nil if not applicable.
 M.get_basic_delimiters = function(char)
     char = M.get_alias(char)
@@ -79,7 +78,7 @@ M.get_basic_delimiters = function(char)
     end
 
     -- If the character is associated with a function, or no pair at all
-    local delimiters = M.get_opts().delimiters.pairs[char] or M.get_opts().delimiters.separators[char]
+    local delimiters = config.get_opts().delimiters.pairs[char] or config.get_opts().delimiters.separators[char]
     if type(delimiters) ~= "table" then
         return nil
     end
@@ -129,7 +128,7 @@ M.get_surrounding_selections = function(char)
     local ch = char
     if html.get_type(char) then
         ch = "t"
-    elseif char == "\"" then
+    elseif char == '"' then
         ch = [[\"]]
     end
 
@@ -159,8 +158,10 @@ M.get_surrounding_selections = function(char)
     if delimiters then
         local open_line = buffer.get_lines(open_first[1], open_first[1])[1]
         local close_line = buffer.get_lines(close_last[1], close_last[1])[1]
-        if open_line:sub(open_first[2], open_last[2]) ~= delimiters[1][1] or
-            close_line:sub(close_first[2], close_last[2]) ~= delimiters[2][1] then
+        if
+            open_line:sub(open_first[2], open_last[2]) ~= delimiters[1][1]
+            or close_line:sub(close_first[2], close_last[2]) ~= delimiters[2][1]
+        then
             -- If not strictly there, trim the delimiters' whitespace and try again
             delimiters[1][1] = vim.trim(delimiters[1][1])
             delimiters[2][1] = vim.trim(delimiters[2][1])
@@ -186,7 +187,6 @@ M.get_surrounding_selections = function(char)
             last_pos = close_last,
         },
     }
-    buffer.set_curpos(curpos)
     return selections
 end
 

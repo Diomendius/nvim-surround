@@ -27,14 +27,6 @@ M.reset_curpos = function(pos)
     end
 end
 
---[[
-Sets the position of the cursor, 1-indexed.
-@param pos The input position.
-]]
-M.set_curpos = function(pos)
-    vim.api.nvim_win_set_cursor(0, { pos[1], pos[2] - 1 })
-end
-
 --[============================================================================[
                              Mark helper functions
 --]============================================================================]
@@ -85,9 +77,9 @@ M.adjust_mark = function(mark)
     M.set_mark(mark, pos)
 end
 
--- Sets the operator marks according to a given character.
----@param char string The given character.
-M.set_operator_marks = function(char)
+-- Sets the operator marks according to a given text-object.
+---@param object string The given text-object.
+M.set_operator_marks = function(object)
     local curpos = M.get_curpos()
     -- Clear the [ and ] marks
     M.del_mark("[")
