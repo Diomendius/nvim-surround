@@ -196,14 +196,13 @@ end
 
 ---@param mode string
 M.normal_callback = function(mode)
-    -- Adjust the ] mark if the operator was in line-mode, e.g. `ip`
+    -- Adjust the ] mark if the operator was a linewise operation, e.g. `ip`
     if mode == "line" then
         local pos = buffer.get_mark("]")
         if not pos then
             return
         end
-        pos = { pos[1], #buffer.get_line(pos[1]) }
-        buffer.set_mark("]", pos)
+        buffer.set_mark("]", { pos[1], #buffer.get_line(pos[1]) })
     end
 
     local selection = utils.get_selection(false)

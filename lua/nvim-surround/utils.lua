@@ -5,7 +5,16 @@ local html = require("nvim-surround.html")
 local M = {}
 
 -- Do nothing.
-M.NOOP = function() end
+M.NOOP = function(mode)
+    -- Adjust the ] mark if the operator was a linewise operation.
+    if mode == "line" then
+        local pos = buffer.get_mark("]")
+        if not pos then
+            return
+        end
+        buffer.set_mark("]", { pos[1], #buffer.get_line(pos[1]) })
+    end
+end
 
 -- Gets a character input from the user.
 ---@return string? @The input character, or nil if a control character is pressed.
@@ -147,9 +156,9 @@ M.get_surrounding_selections = function(char)
     close_first = { close_first[1], close_first[2] + 1 }
     -- Move selections if they land before/after the line
     if open_last[2] == 0 then
-        open_last[2] = 1
+        open_last = { open_last[1] - 1, #buffer.get_line(open_last[1] - 1) }
     end
-    if close_first[2] > #buffer.get_lines(close_first[1], close_first[1])[1] then
+    if close_first[2] > #buffer.get_line(close_first[1]) then
         close_first = { close_first[1] + 1, 1 }
     end
 

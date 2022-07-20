@@ -87,9 +87,11 @@ M.set_operator_marks = function(object)
     -- Set the [ and ] marks by calling an operatorfunc
     vim.go.operatorfunc = "v:lua.require'nvim-surround.utils'.NOOP"
     vim.cmd("normal g@" .. object)
-    -- Adjust the marks to not reside on whitespace
-    M.adjust_mark("[")
-    M.adjust_mark("]")
+    -- Adjust the marks to not reside on whitespace if necessary
+    if object:sub(1, 1) == "a" and config.get_opts().delimiters.separators[object:sub(2, 2)] then
+        M.adjust_mark("[")
+        M.adjust_mark("]")
+    end
     M.set_curpos(curpos)
 end
 
