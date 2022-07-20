@@ -33,6 +33,7 @@ nvim-surround.setup({opts})
         highlight_motion = {
             -- Customize highlight properties here
         },
+        -- Other options here...
     })
 <
 
@@ -41,15 +42,33 @@ nvim-surround.setup({opts})
 
                                                        *nvim-surround.keymaps*
     keymaps:~
-        Defines what keymaps are used to interact with the plugin. The
-        {insert_line} key is used to surround the current line (not including
-        leading nor trailing whitespace), and can be thought of as a special
-        case of {insert}.
+        Defines what keymaps are used to interact with the plugin.
+
+        There are three main types of surround "actions": add, delete, and
+        change.
+
+
+        Keys with the suffix `_cur` are a special case where the mapping
+        applies to the current line, and keys with the suffix `_line` add the
+        delimiters to a new line.
+
+        The type of visual surround also affects behavior:
+        * |charwise-visual|: Adds one pair of delimiters around the whole
+          visual selection.
+        * |linewise-visual|: Adds one pair of delimiters around the whole
+          visual selection, each delimiter on a new line.
+        * |blockwise-visual|: Adds one pair of delimiters per line, for each
+          line in the block.
 
         Default: {
-            insert = "ys",
-            insert_line = "yss",
+            insert = "<C-g>s",
+            insert_line = "<C-g>S",
+            normal = "ys",
+            normal_cur = "yss",
+            normal_line = "yS",
+            normal_cur_line = "ySS",
             visual = "S",
+            visual_line = "gS",
             delete = "ds",
             change = "cs",
         }
@@ -58,14 +77,36 @@ nvim-surround.setup({opts})
     delimiters:~
         A table of various types of delimiters that are available to the user.
 
-    Types of {opts.delimiters}
+        All keys should be exactly one character, and unique. Each value is
+        either a pair of strings, representing the left and right surrounding
+        pair, or a function returning a pair of strings.
 
+        Note: Multi-line strings are represented by a table of strings, with
+        each string representing a new line.
+
+        Valid keys for {opts.delimiters}
+
+                               *nvim-surround.delimiters.invalid_key_behavior*
+        invalid_key_behavior:~
+            A function with parameter {char} that describes how to handle
+            cases when an invalid character is used to retrieve a delimiter
+            pair. It optionally returns the delimiter pair to be used.
+
+            Default:
+>
+            function()
+                vim.api.nvim_err_writeln(
+                    'Error: Invalid character! Configure this message in ' ..
+                    'require("nvim-surround").setup()'
+                )
+            end
+<
                                               *nvim-surround.delimiters.pairs*
         pairs:~
             A table that associates characters with a pair of distinct
-            delimiters, used for inserting/changing/deleting. Each delimiter
-            can either be a simple string, or a table containing strings,
-            where each element of the table will be put on its own line.
+            delimiters, used for adding/changing/deleting. Each delimiter can
+            either be a simple string, or a table containing strings, where
+            each element of the table will be put on its own line.
 
             More powerful pairs can be created using an anonymous function
             that returns a table of two delimiters. This can be used to query
@@ -91,6 +132,18 @@ nvim-surround.setup({opts})
             the selection with parentheses and prepends a user-given function
             name.
 
+            Note: The built-in function `vim.fn.input()` does not handle
+            keyboard interrupts, so a protected call is used by default to
+            allow input cancellation via <C-c>:
+>
+            local get_input = function(prompt)
+                local ok, result = pcall(vim.fn.input, { prompt = prompt })
+                if not ok then
+                    return nil
+                end
+                return result
+            end
+<
             Default: {
                 ["("] = { "( ", " )" },
                 [")"] = { "(", ")" },
@@ -101,29 +154,26 @@ nvim-surround.setup({opts})
                 ["["] = { "[ ", " ]" },
                 ["]"] = { "[", "]" },
                 ["i"] = function()
-                    return {
-                        utils.get_input(
-                            "Enter the left delimiter: "
-                        ),
-                        utils.get_input(
-                            "Enter the right delimiter: "
-                        )
-                    }
+                    local left_delimiter = get_input("Enter the left delimiter: ")
+                    if left_delimiter then
+                        local right_delimiter = get_input("Enter the right delimiter: ")
+                        if right_delimiter then
+                            return { left_delimiter, right_delimiter }
+                        end
+                    end
                 end,
                 ["f"] = function()
-                    return {
-                        utils.get_input(
-                            "Enter the function name: "
-                        ) .. "(",
-                        ")"
-                    }
+                    local result = get_input("Enter the function name: ")
+                    if result then
+                        return { result .. "(", ")" }
+                    end
                 end,
             }
 
                                          *nvim-surround.delimiters.separators*
         separators:~
             A table that associates characters with a pair of non-distinct
-            delimiters, used for inserting/changing/deleting.
+            delimiters, used for adding/changing/deleting.
 
             Default: {
                 ["'"] = { "'", "'" },
@@ -179,10 +229,10 @@ nvim-surround.setup({opts})
             }
 
                                               *nvim-surround.highlight_motion*
-    When inserting/changing a surrounding pair, one may optionally highlight
-    the selection(s) of interest. During insertion, the selection around which
-    the pair will be added is highlighted. During changing, the surrounding
-    pair to be replaced is highlighted.
+    When adding/changing a surrounding pair, one may optionally highlight the
+    selection(s) of interest. During insertion, the selection around which the
+    pair will be added is highlighted. During changing, the surrounding pair
+    to be replaced is highlighted.
 
     The relevant highlight group is "NvimSurroundHighlightTextObject", which
     can be configured separately.
@@ -198,6 +248,26 @@ nvim-surround.setup({opts})
 
         Default: 0
 
+                                                   *nvim-surround.move_cursor*
+    When adding/changing/deleting surrounds, one may choose to move the cursor
+    to the beginning of the surround, or keep it stationary. A value of
+    `false` means that the cursor will not move, while a value of "begin"
+    means that the cursor will "jump" to the beginning of the surround.
+
+    For example, consider:
+>
+    Buffer: This statement "should not" have quotes.
+    Cursor:      1         2               3
+<
+    If `move_cursor` is set to "begin", then typing `dsq` from either position
+    1 or 3 will result in the cursor "jumping" to location 2.
+
+    If `move_cursor` is set to `false` then typing `dsq` from either position
+    1 or 3 will not move the cursor. Note that position 3 now refers to the
+    "q" in "quotes", since two characters before the cursor have been removed.
+
+    Default: "begin"
+
                                                 *nvim-surround.buffer_setup()*
 nvim-surround.buffer_setup({opts})
     Sets up user configuration options for the current buffer. It allows users
@@ -206,13 +276,21 @@ nvim-surround.buffer_setup({opts})
     One example is to set up different `f` mappings for Python and Lua file
     types via:
 >
+    local get_input = function(prompt)
+        local ok, result = pcall(vim.fn.input, { prompt = prompt })
+        if not ok then
+            return nil
+        end
+        return result
+    end
+
     -- ftplugin/python.lua
     require("nvim-surround").buffer_setup({
         delimiters = {
             pairs = {
                 ["f"] = function()
                     return {
-                        "def " .. require("nvim-surround.utils").get_input(
+                        "def " .. get_input(
                             "Enter the function name: "
                         ) .. "(",
                         "):"
@@ -227,7 +305,7 @@ nvim-surround.buffer_setup({opts})
             pairs = {
                 ["f"] = function()
                     return {
-                        "function " .. require("nvim-surround.utils").get_input(
+                        "function " .. get_input(
                             "Enter the function name: "
                         ) .. "(",
                         ")"
@@ -244,10 +322,10 @@ Under certain circumstances, |nvim-surround| can "jump" to the "nearest"
 delimiter. It always prefers
 * pairs that surround the cursor, before
 * pairs that occur after the cursor, before
-* pairs that occur before the cursor
+* pairs that occur before the cursor.
 
 Note: Reverse jumping is only available for changing/deleting surrounds, not
-inserting a new pair.
+adding a new pair.
 
 An example of this behavior is as follows:
 >
@@ -276,4 +354,4 @@ In the above example, typing `dsq` at locations:
 * 3, 4: Deletes the single quotes `'`
 * 6, 7: Deletes the backticks ```
 
-vim:tw=78:ts=8:ft=help:norl:
+vim:tw=78:ts=8:ft=help:norl:conceallevel=0:
